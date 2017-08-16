@@ -1,0 +1,6 @@
+build
+resources
+tests
+snippets
+*.sublime-*
+Makefile
