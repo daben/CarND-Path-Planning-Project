@@ -4,6 +4,7 @@ Self-Driving Car Engineer Nanodegree Program
 ---
 
 ![[Video][video.mp4]](video.gif)
+
 *Download [video.mp4](video.mp4?raw=true) for the full video.*
 
 ## Description
