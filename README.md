@@ -82,15 +82,15 @@ On enter, fix the target lane as the changing lane, of the closest lane in the d
 
 If the target lane is feasible, transition to lane change.
 
-If not feasible and the changing lane is not the fastest or we have been in this state for too long, abort and transition back to keep lane.
+If not feasible and the changing lane is not the fastest, or we have been in this state for too long, abort and transition back to KL.
 
-Otherwise, wait for an opportunity to change the lane, adjusting the speed if necessary.
+Otherwise, wait for an opportunity to change the lane adjusting the speed if necessary.
 
 ##### Lane Change State
 
 When current lane change completed, if it's not the final lane, transition to PLC, else to KL.
 
-If a risk of collision is detected in the middle of a lane change the change is aborted fixing the lane target to the reference.
+If a risk of collision is detected in the middle of a lane change the change is aborted setting the lane target to the reference lane.
 
 #### 4. Collision avoidance
 
@@ -100,11 +100,15 @@ See method `PathPlanner::collision_avoidance`.
 
 #### 5. Speed control
 
-A simple mechanism to accelerate in a safe manner. If defines de final target speed for the trajectory generator.
+A simple mechanism to accelerate safely. If defines the final target speed for the trajectory generator.
+
+See method `PathPlanner::speed_control`.
 
 #### 6. Trajectory generation
 
 Generates a smooth trajectory from the reference point to the target lane and to the target speed. The trajectory is generated using a cubic spline interpolation in the manner described in the walkthrough video.
+
+See method `PathPlanner::build_path`.
 
 ---
 
