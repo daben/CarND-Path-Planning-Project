@@ -2,5 +2,7 @@ build
 resources
 tests
 snippets
+scripts
 *.sublime-*
 Makefile
+palette.png
