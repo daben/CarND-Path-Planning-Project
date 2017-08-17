@@ -350,7 +350,7 @@ namespace carnd // === Planner ====================
     RoadMap   roadmap;
     Track     track;
 
-    double    accel = 0.22;     // m/s^2
+    double    accel = 0.2;     // m/s^2
     double    lane_horizon = 50;   // m
     double    lane_change_front_buffer = 15; // m
     double    lane_change_back_buffer = 7;  // m
