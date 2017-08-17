@@ -21,7 +21,7 @@ debug_log_disabled_& operator << (debug_log_disabled_& any, T const& thing) { re
 #endif
 
 
-// Anonymous namespace to avoid duplicated symbols in object files
+// Anonymous namespace to force internal linkage. 
 namespace {
 
 namespace carnd // == Utils ===================================================
@@ -283,11 +283,6 @@ namespace carnd // === Localization ===========================================
     double distance_to_lane(double d, int lane) {
       return lane_center(lane) - d;
     }
-
-    // FIXME fractional version
-    double lane_center_distance_at(double d) const {
-      return std::fmod(d, lane_width) / (lane_width / 2) - 1;
-    }
   };
 } // ::carnd
 
@@ -422,6 +417,8 @@ namespace carnd // === Planner ====================
     void compute_reference(const telemetry_data & ego, double dt);
     void process_sensor_fusion(const telemetry_data & ego, double dt);
     void create_plan(const telemetry_data & ego, double dt);
+    void collision_avoidance();
+    void speed_control();
     void build_path(const telemetry_data & ego,
                     const int target_lane,
                     const double target_speed,
@@ -437,13 +434,17 @@ namespace carnd // === Planner ====================
   void PathPlanner::run(const telemetry_data & ego, path_t & path, double dt) {
     // 1a. Get reference point: where we start to build the plan
     compute_reference(ego, dt);
-    // 1b. Track laps
+    // 1b. Track laps just for the shake of it
     track_lap(ego);
     // 2. Analyse the environment
     process_sensor_fusion(ego, dt);
     // 3. Behaviour; set target lane and speed
     create_plan(ego, dt);
-    // 4. Generate final trajectory
+    // 4. Avoid collisions
+    collision_avoidance();
+    // 5. Control speed
+    speed_control();
+    // 6. Generate final trajectory
     build_path(ego, target_lane, target_speed, path, dt);
   }
 
@@ -761,6 +762,7 @@ namespace carnd // === Planner ====================
         {
           // ABORT
           target_lane = ref_lane;
+          changing_lane = -1;
           DEBUG_LOG << " * ABORTING LANE CHANGE" << endl;
         }
 
@@ -776,20 +778,25 @@ namespace carnd // === Planner ====================
       break;
     }
 
+    // Ensure the target speed is inside the limits
+    // NOTE that we don't consider the possibility of moving backwards.
+    target_speed = fmax(0.0, fmin(road_speed_limit, target_speed));
+  }
+
+  void PathPlanner::collision_avoidance() {
     // Avoid collisions
     if (lane_info[target_lane].front_gap < 30)
     {
       if (lane_info[target_lane].front_gap < 15)
-        target_speed = fmin(target_speed, lane_info[target_lane].front_speed - 0.2);
+        target_speed = fmax(0, fmin(target_speed, lane_info[target_lane].front_speed - 0.2));
       else
         target_speed = fmin(target_speed, lane_info[target_lane].front_speed);
+
       DEBUG_LOG << " * FOLLOWING THE LEAD (" << lane_info[target_lane].front_gap << " m)" << endl;
     }
+  }
 
-    // Ensure the target speed is inside the limits
-    // NOTE that we don't consider the possibility of moving backwards.
-    target_speed = fmax(0.0, fmin(road_speed_limit, target_speed));
-
+  void PathPlanner::speed_control() {
     // Adjust speed
     if (target_speed < ref_speed) {
       // deccelerate
@@ -799,11 +806,6 @@ namespace carnd // === Planner ====================
       // accelerate
       target_speed = fmin(target_speed, ref_speed + accel);
     }
-
-    DEBUG_LOG << "TRAJECTORY" << endl
-              << " * TARGET LANE " << target_lane << endl
-              << " * TARGET SPEED " << setprecision(1) << mps2mph(target_speed)
-              << endl;
   }
 
 
@@ -812,6 +814,11 @@ namespace carnd // === Planner ====================
                                const double target_speed,
                                path_t & path, double dt)
   {
+    DEBUG_LOG << "TRAJECTORY" << endl
+              << " * TARGET LANE " << target_lane << endl
+              << " * TARGET SPEED " << setprecision(1) << mps2mph(target_speed)
+              << endl;
+
     const auto target_d = track.safe_lane_center(target_lane);
 
     // trajectory points
