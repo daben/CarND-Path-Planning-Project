@@ -1,7 +1,115 @@
 # CarND-Path-Planning-Project
 Self-Driving Car Engineer Nanodegree Program
-   
-### Simulator.
+
+---
+
+![[Video][video.mp4]](video.gif)
+*Download [video.mp4](video.mp4?raw=true) for the full video.*
+
+## Description
+
+The goal of this project is to design a path planner that is able to create smooth, safe paths for the car to follow along a 3 lane highway with traffic. See below for a more detailed description of project.
+
+The solution consists of the following files: 
+
+* `main.cpp`: interfaces with the simulator and invokes the path planner.
+* `planner.hpp`: implements the path planner. Given the telemetry data provided from the simulator generates a new path for the car in world coordinates.
+* `spline.h`: cubic spline interpolation library by Tino Kluge used by the trajectory generator.
+* `json.hpp`: JSON library for C++ used to interface the simulator.
+
+*Note that Eigen is not used in this solution.*
+
+The localization component used by the planner is built over the waypoint list provided. See the classes `RoadMap` and `Track` in the file `planner.hpp`.
+
+The planner itself proceeds in six steps: 
+
+#### 1. Compute the reference point
+
+It sets two points from the end of the previous path, or the current position of the car if the previous path has been consumed, that allow to create a tangent line in the direction of the car.
+
+See method `PathPlanner::compute_reference`.
+    
+#### 2. Process the sensor fusion data 
+
+The data from the sensor fusion is analysed and a table with the state of all the lanes is produced. For each lane, a struct `lane_info_t` is filled containing information about the cars ahead and behind of the reference position: their unique id, their gap and their speed. 
+    
+This is the definition of the lane info struct with is default values:
+    
+```C++
+struct lane_info_t
+{
+    int    front_car   = -1;
+    int    back_car    = -1;
+    double front_gap   = INF;
+    double front_speed = INF;
+    double back_gap    = INF;
+    double back_speed  = 0;
+    bool   feasible    = true;
+};
+```
+A **feasibility** flag signaling if the gap in the lane is large enough for a lane change is computed here for simplicity in the following manner:
+    
+```C+
+lane.feasible =    (lane.front_gap > lane_change_front_buffer)
+                && (lane.back_gap > lane_change_back_buffer);
+```
+
+See method `PathPlanner::process_sensor_fusion`.
+    
+
+#### 3. Decide next plan
+
+The behavior planner is designed as a simple state machine with three states: *keep lane* (KL), *prepare for lane change* (PLC) and *lane change* (LC). The telemetry and the lane information trigger the transitions between states. KL is the initial state.
+
+The planner is able to plan for a change to a not adjacent lane, however the plan is realised first changing to the lane in the middle. 
+
+The output of the planner are the target lane (variable `target_lane`) and the desired target speed (`target_speed`) that the next stages should consider.
+
+See method `PathPlanner::create_plan`.
+
+##### Keep Lane State
+
+On enter fix the target speed to road limit.
+
+If there is car in front forcing a speed below the road limit and there is a faster lane, set that lane as change target (variable `changing_lane`) and transition to PLC.
+
+The faster lane is decided in the method `PathPlanner::get_best_lane`.
+
+##### Prepare for Lane Change State
+
+On enter, fix the target lane as the changing lane, of the closest lane in the direction of the changing lane. 
+
+If the target lane is feasible, transition to lane change.
+
+If not feasible and the changing lane is not the fastest or we have been in this state for too long, abort and transition back to keep lane.
+
+Otherwise, wait for an opportunity to change the lane, adjusting the speed if necessary.
+
+##### Lane Change State
+
+When current lane change completed, if it's not the final lane, transition to PLC, else to KL.
+
+If a risk of collision is detected in the middle of a lane change the change is aborted fixing the lane target to the reference.
+
+#### 4. Collision avoidance
+
+A simple mechanism to avoid collisions with cars in the target lane reducing the speed. The output of this component is a maximum safe target speed.
+
+See method `PathPlanner::collision_avoidance`.
+
+#### 5. Speed control
+
+A simple mechanism to accelerate in a safe manner. If defines de final target speed for the trajectory generator.
+
+#### 6. Trajectory generation
+
+Generates a smooth trajectory from the reference point to the target lane and to the target speed. The trajectory is generated using a cubic spline interpolation in the manner described in the walkthrough video.
+
+---
+
+## Project instructions
+
+### Simulator
 You can download the Term3 Simulator which contains the Path Planning Project from the [releases tab (https://github.com/udacity/self-driving-car-sim/releases).
 
 ### Goals
